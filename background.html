@@ -73,6 +73,8 @@
     if (localStorage["useSmallerImages"]
         && photo.getAttribute("width_o") > 1280) {
       img.src = constructImageUrl(photo);
+    } else if (photo.getAttribute("url_o") == null || photo.getAttribute("url_o") == "") {
+      img.src = constructImageUrl(photo);
     } else {
       img.src = photo.getAttribute("url_o");
     }
