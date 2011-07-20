@@ -83,8 +83,8 @@
                   "id": photo.getAttribute("id")
                   }
 
-    cached.ownername = 'adewale_oshineye';
-    cached.owner = 'adewale_oshineye';
+    cached.ownername = photo.getAttribute("ownername");
+    cached.owner = photo.getAttribute("owner");
 
     photoCache.push(cached);
     localStorage["photoCache"] = JSON.stringify(photoCache);
