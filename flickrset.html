@@ -7,14 +7,28 @@
     right: 10px;
   }
   #wrapper {
-    background-color: #EEE;
+    background-color: rgba(0,0,0,0.6);
+    color: #eee;
     opacity: 0;
     -webkit-transition-property: opacity;
     -webkit-transition-duration: 0.8s;
     padding: 0.4em;
-    border-radius: 6px;
+    border-radius: 1em;
+    padding-left: 0.9em;
+    padding-right: 0.9em;
     font-family: sans-serif;
-    display: block;
+    display: inline-block;
+    vertical-align:middle;
+  }
+  #plusone {
+/*    display: inline-block;
+    vertical-align:middle;*/
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    opacity: 0;
+    -webkit-transition-property: opacity;
+    -webkit-transition-duration: 0.8s;
   }
   a:link, a:visited {
     color: #333;
@@ -26,41 +40,84 @@
   span.owner {
     font-size: small;
   }
-  
+
   #container {
     overflow: scroll;
     position: absolute;
     left: 10px;
     bottom: 10px;
-    top: 10px;
+    top: 44px;
     background-color: rgba(0, 0, 0, 0.4);
     box-shadow: 0px 0px 5px #000;
-    opacity:0;
-    -webkit-transition: opacity ease-in-out 0.5s;
-    padding:10px;
+    opacity: 0;
+    padding: 10px;
+    -webkit-perspective: 400;
+    -webkit-transform-style: preserve-3d;
+    -webkit-transition-properties: -webkit-transform opacity;
+    -webkit-transition-duration: 0.5s;
+    -webkit-transform: translateX(-15px) translateZ(150px) rotateY(25deg);
+    -webkit-transform-origin: 50% 50%;
   }
-  
+
   #apps {
     height: 100%;
     color: white;
     font-family: Arial;
+    -webkit-transform-style: preserve-3d;
   }
-  
+
   .app {
-   margin-bottom: 10px;   
+    margin-bottom: 10px;
+    -webkit-perspective: 400;
+    -webkit-transform-style: preserve-3d;
+    -webkit-transition-duration: 0.5s;
+    -webkit-transform-origin: 50% 50%;
   }
-  
+  .app:hover {
+    -webkit-transform: translateX(11px) translateZ(150px) rotateY(-22deg);
+  }
+
   #container:hover {
     opacity: 1;
+    -webkit-transform: translateX(0px) translateZ(0px) rotateY(0deg);
   }
-  
+
   ::-webkit-scrollbar {
     width: 0px;
     height: 0px;
     opacity: 0;
   }
-  
-</style > 
+
+  #stage {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    -webkit-transform-style: preserve-3d;
+    -webkit-perspective: 800;
+  }
+  #bg {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    -webkit-transform-origin: 50% 50%;
+    -webkit-transform: scale(1);
+    -webkit-transform-style: preserve-3d;
+    -webkit-transition-duration: 10s;
+    overflow: hidden;
+  }
+  #bg img {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    -webkit-transform-origin: 0% 0%;
+  }
+  body {
+    overflow: hidden;
+  }
+
+</style >
 
 <script>
 var getAllCallback = function(list) {
@@ -85,7 +142,7 @@ var getAllCallback = function(list) {
             }
         }
     };
-    
+
 var find128Image = function(icons) {
         for (var icon in icons) {
             if (icons[icon].size == "128") {
@@ -94,29 +151,44 @@ var find128Image = function(icons) {
         }
         return "/noicon.png";
     };
-    
+
 var loadApps = function() {
         chrome.management.getAll(getAllCallback);
     };
-    
+
 window.addEventListener("DOMContentLoaded", function() {
     loadApps();
-    
+
     var cachedImages = JSON.parse(localStorage["photoCache"]);
     var whichImage = Math.round(Math.random() * (cachedImages.length - 1));
     var cached = cachedImages[whichImage];
-    document.body.style.backgroundImage = "url(" + cached.src + ")";
-    document.body.style.backgroundSize = "cover";
+    var bg = document.getElementById('bg');
+    bg.style.width = window.innerWidth + 'px';
+    bg.style.height = window.innerHeight + 'px';
+    var img = new Image();
+    img.onload = function() {
+      var f = Math.max(window.innerWidth/img.width, window.innerHeight/img.height);
+      img.style.webkitTransform = 'scale('+f+')';
+      img.style.left = (window.innerWidth - img.width*f) / 2 + 'px';
+      img.style.top = (window.innerHeight- img.height*f) / 2 + 'px';
+    };
+    img.src = cached.src;
+    bg.appendChild(img);
+    var tgtX = 25+Math.floor(Math.random()*3) * 25 + '%';
+    var tgtY = 25+Math.floor(Math.random()*3) * 25 + '%';
+    bg.style.webkitTransformOrigin = tgtX + ' ' + tgtY;
+    bg.style.webkitTransform = 'scale(1.2)';
     var byline = document.getElementById("wrapper");
     byline.href = 'http://www.flickr.com/photos/' + cached.owner + '/' + cached.id;
     var link = document.createElement("link");
     link.rel = "canonical";
     link.href = byline.href;
     document.head.appendChild(link);
- 
-    
+
+    var plusone = document.getElementById('plusone');
+
     gapi.plusone.go();
-    
+
     if (false && localStorage['showTitle']) {
         var title = document.createElement("span");
         title.setAttribute("class", "title");
@@ -149,25 +221,31 @@ window.addEventListener("DOMContentLoaded", function() {
                 mouseX = evt.pageX;
             }
             if (!mouseX != evt.pageX) {
-                byline.style.opacity = 0.6;
+                byline.style.opacity = 1;
+                plusone.style.opacity = 1;
                 document.body.onmousemove = null;
             }
         }
     }, 200);
-}, false); 
+}, false);
 
 </script>
 
 
-</head> 
+</head>
     <body>
-        <div id="byline">
-          <a href="#" id="wrapper"></a>
-          <script type="text/javascript" src="https://apis.google.com/js/plusone.js">
-  {parsetags: 'explicit'}
-</script>
-         <div class="g-plusone" data-size="standard" data-count="true"></div>
-        </div>
-        <div id="container"><div id="apps"> </div></div>
+      <div id="stage">
+        <div id="bg"></div>
+      </div>
+      <div id="byline">
+        <a href="#" id="wrapper"></a>
+      </div>
+      <div id="plusone">
+        <script type="text/javascript" src="https://apis.google.com/js/plusone.js">
+          {parsetags: 'explicit'}
+        </script>
+       <div class="g-plusone" data-size="standard" data-count="true"></div>
+      </div>
+      <div id="container"><div id="apps"> </div></div>
     </body>
 </html>
