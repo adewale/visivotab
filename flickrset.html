@@ -102,7 +102,7 @@
     width: 100%;
     height: 100%;
     -webkit-transform-origin: 50% 50%;
-    -webkit-transform: scale(1);
+    -webkit-transform: scale(1.2);
     -webkit-transform-style: preserve-3d;
     -webkit-transition-duration: 10s;
     overflow: hidden;
@@ -177,7 +177,7 @@ window.addEventListener("DOMContentLoaded", function() {
     var tgtX = 25+Math.floor(Math.random()*3) * 25 + '%';
     var tgtY = 25+Math.floor(Math.random()*3) * 25 + '%';
     bg.style.webkitTransformOrigin = tgtX + ' ' + tgtY;
-    bg.style.webkitTransform = 'scale(1.2)';
+    bg.style.webkitTransform = 'scale(1.0)';
     var byline = document.getElementById("wrapper");
     byline.href = 'http://www.flickr.com/photos/' + cached.owner + '/' + cached.id;
     var link = document.createElement("link");
