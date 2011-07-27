@@ -51,35 +51,21 @@
     box-shadow: 0px 0px 5px #000;
     opacity: 0;
     padding: 10px;
-    -webkit-perspective: 400;
-    -webkit-transform-style: preserve-3d;
-    -webkit-transition-properties: -webkit-transform opacity;
-    -webkit-transition-duration: 0.5s;
-    -webkit-transform: translateX(-15px) translateZ(150px) rotateY(25deg);
-    -webkit-transform-origin: 50% 50%;
+    -webkit-transition: opacity 0.5s linear ;
   }
 
   #apps {
     height: 100%;
     color: white;
     font-family: Arial;
-    -webkit-transform-style: preserve-3d;
   }
 
   .app {
     margin-bottom: 10px;
-    -webkit-perspective: 400;
-    -webkit-transform-style: preserve-3d;
-    -webkit-transition-duration: 0.5s;
-    -webkit-transform-origin: 50% 50%;
-  }
-  .app:hover {
-    -webkit-transform: translateX(11px) translateZ(150px) rotateY(-22deg);
   }
 
   #container:hover {
     opacity: 1;
-    -webkit-transform: translateX(0px) translateZ(0px) rotateY(0deg);
   }
 
   ::-webkit-scrollbar {
