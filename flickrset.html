@@ -1,28 +1,32 @@
 <html>
 <head> <title> New Tab </title>
 <style>
+  html {
+    background-color: black;
+  }
   #byline {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 9px;
+    right: 9px;
   }
   #wrapper {
-    background-color: rgba(0,0,0,0.6);
-    color: #eee;
+    background-color: rgba(255,255,255,1);
+    color: #666;
     opacity: 0;
     -webkit-transition-property: opacity;
     -webkit-transition-duration: 0.8s;
     padding: 0.4em;
-    border-radius: 1em;
-    padding-left: 0.9em;
-    padding-right: 0.9em;
+    border-radius: 0.3em;
+    padding-left: 2em;
+    padding-right: 2em;
+    padding-top: 0.3em;
     font-family: sans-serif;
+    font-size: 13px;
     display: inline-block;
     vertical-align:middle;
+    border: 1px solid #ccc;
   }
   #plusone {
-/*    display: inline-block;
-    vertical-align:middle;*/
     position: absolute;
     top: 10px;
     left: 10px;
@@ -51,21 +55,24 @@
     box-shadow: 0px 0px 5px #000;
     opacity: 0;
     padding: 10px;
-    -webkit-transition: opacity 0.5s linear ;
+    -webkit-perspective: 400;
+    -webkit-transform-style: preserve-3d;
+    -webkit-transition-property: -webkit-transform opacity;
+    -webkit-transition-duration: 0.5s;
+    -webkit-transform: translateX(-15px) translateZ(150px) rotateY(25deg);
+    -webkit-transform-origin: 50% 50%;
   }
 
   #apps {
     height: 100%;
     color: white;
     font-family: Arial;
-  }
-
-  .app {
-    margin-bottom: 10px;
+    -webkit-transform-style: preserve-3d;
   }
 
   #container:hover {
     opacity: 1;
+    -webkit-transform: translateX(0px) translateZ(0px) rotateY(0deg);
   }
 
   ::-webkit-scrollbar {
@@ -88,6 +95,7 @@
     width: 100%;
     height: 100%;
     -webkit-transform-origin: 50% 50%;
+    -webkit-transition-property: -webkit-transform;
     -webkit-transform: scale(1.2);
     -webkit-transform-style: preserve-3d;
     -webkit-transition-duration: 10s;
@@ -98,6 +106,9 @@
     top: 0px;
     left: 0px;
     -webkit-transform-origin: 0% 0%;
+    opacity: 0;
+    -webkit-transition-property: opacity;
+    -webkit-transition-duration: 1s;
   }
   body {
     overflow: hidden;
@@ -153,6 +164,15 @@ window.addEventListener("DOMContentLoaded", function() {
     bg.style.height = window.innerHeight + 'px';
     var img = new Image();
     img.onload = function() {
+<<<<<<< HEAD
+=======
+      window.onresize();
+      img.style.opacity = 1;
+    };
+    window.onresize = function() {
+      bg.style.width = window.innerWidth + 'px';
+      bg.style.height = window.innerHeight + 'px';
+>>>>>>> b53da05141c3d79fc78474444a8215973661f391
       var f = Math.max(window.innerWidth/img.width, window.innerHeight/img.height);
       img.style.webkitTransform = 'scale('+f+')';
       img.style.left = (window.innerWidth - img.width*f) / 2 + 'px';
