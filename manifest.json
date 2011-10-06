@@ -1,7 +1,7 @@
 {
-  "name": "AdeTab",
-  "version": "1.4",
-  "description": "Beautiful photos hand-selected by Flickr's adewale_oshineye for your New Tab",
+  "name": "GPlusTab",
+  "version": "1.5",
+  "description": "Beautiful photos hand-selected from the Flickr collection of the Google+ team's Adewale Oshineye for your New Tab. Don't forget to +1 the photos you like. Or add me to your circles at: www.oshineye.com/+ ",
   "chrome_url_overrides": {
     "newtab": "flickrset.html"
   },
@@ -11,6 +11,6 @@
     "tabs",
     "management"
   ],
-  "icons": {"48": "adetab_48.jpg",
-            "128": "adetab_128.jpg"}
+  "icons": {"48": "gplustab_48.jpg",
+            "128": "gplustab_128.jpg"}
 }
