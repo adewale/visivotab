@@ -11,8 +11,8 @@
 
   // CONFIG OPTIONS
   localStorage["useSmallerImages"] = true;
-  localStorage["showTitle"] = false;
-  //localStorage["showOwner"] = true;
+  localStorage["showTitle"] = true;
+  localStorage["showOwner"] = true;
 
   function fetchPool(poolId, callback) {
     var req = new XMLHttpRequest();
@@ -47,7 +47,7 @@
   function fillCache(req) {
     var photoset = req.responseXML.getElementsByTagName("photoset");
     var photos = req.responseXML.getElementsByTagName("photo");
-    log(photos);
+    log("adding photos");
 
     // start adding some new ones
     function againAndAgain() {
@@ -68,6 +68,7 @@
     var whichPhoto = Math.round(Math.random() * (aPhotos.length - 1));
     var photo = aPhotos[whichPhoto];
     log("adding photo");
+	log(photo);
 
     var img = document.createElement("image");
     if (localStorage["useSmallerImages"]
@@ -85,8 +86,8 @@
                   "id": photo.getAttribute("id")
                   }
 
-    cached.ownername = photo.getAttribute("ownername");
-    cached.owner = photo.getAttribute("owner");
+    cached.ownername = "Adewale Oshineye"
+    cached.owner = 'adewale_oshineye'
 
     photoCache.push(cached);
     localStorage["photoCache"] = JSON.stringify(photoCache);

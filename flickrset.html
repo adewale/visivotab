@@ -164,15 +164,12 @@ window.addEventListener("DOMContentLoaded", function() {
     bg.style.height = window.innerHeight + 'px';
     var img = new Image();
     img.onload = function() {
-<<<<<<< HEAD
-=======
       window.onresize();
       img.style.opacity = 1;
     };
     window.onresize = function() {
       bg.style.width = window.innerWidth + 'px';
       bg.style.height = window.innerHeight + 'px';
->>>>>>> b53da05141c3d79fc78474444a8215973661f391
       var f = Math.max(window.innerWidth/img.width, window.innerHeight/img.height);
       img.style.webkitTransform = 'scale('+f+')';
       img.style.left = (window.innerWidth - img.width*f) / 2 + 'px';
@@ -195,27 +192,27 @@ window.addEventListener("DOMContentLoaded", function() {
 
     gapi.plusone.go();
 
-    if (false && localStorage['showTitle']) {
+    if (localStorage['showTitle']) {
         var title = document.createElement("span");
         title.setAttribute("class", "title");
         if (cached.title) {
             var escapedTitle = cached.title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
-            title.innerHTML = escapedTitle;
+            title.innerHTML = escapedTitle + " by ";
         }
         else {
-            title.innerHTML = "untitled";
+            title.innerHTML = "by ";
         }
         byline.appendChild(title);
         if (localStorage['showOwner']) {
             var owner = document.createElement("span");
             owner.setAttribute("class", "owner");
             var escapedOwnername = cached.ownername.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
-            owner.innerHTML = " by " + escapedOwnername;
+            owner.innerHTML = escapedOwnername;
             byline.appendChild(owner);
         }
     }
     else {
-        byline.innerHTML = "view in photostream";
+        byline.innerHTML = "View in photostream";
     }
     window.onbeforeunload = function() {
         document.body.onmousemove = null;
