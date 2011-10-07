@@ -68,7 +68,6 @@
     var whichPhoto = Math.round(Math.random() * (aPhotos.length - 1));
     var photo = aPhotos[whichPhoto];
     log("adding photo");
-	log(photo);
 
     var img = document.createElement("image");
     if (localStorage["useSmallerImages"]
@@ -86,8 +85,8 @@
                   "id": photo.getAttribute("id")
                   }
 
-    cached.ownername = "Adewale Oshineye"
-    cached.owner = 'adewale_oshineye'
+    cached.ownername = "Adewale Oshineye";
+    cached.owner = "adewale_oshineye";
 
     photoCache.push(cached);
     localStorage["photoCache"] = JSON.stringify(photoCache);

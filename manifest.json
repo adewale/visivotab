@@ -1,7 +1,7 @@
 {
   "name": "GPlusTab",
   "version": "1.5",
-  "description": "Beautiful photos hand-selected from the Flickr collection of the Google+ team's Adewale Oshineye for your New Tab. Don't forget to +1 the photos you like. Or add me to your circles at: www.oshineye.com/+ ",
+  "description": "Beautiful photos hand-selected by Ade Oshineye for your New Tab. Don't forget to +1 your favourites and add me to your circles.",
   "chrome_url_overrides": {
     "newtab": "flickrset.html"
   },
