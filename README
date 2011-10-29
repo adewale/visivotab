@@ -1,6 +1,8 @@
-VisivoTab
+GPlusTab
 =========
 
-This is a little chrome extension I made to showcase visivo on Flickr's photos.
+A little chrome extension originally made by @termie to showcase visivo on Flickr's photos.
 
-Open sourcing the code because I've received some offers of patches.
+Modified by Paul Kinlan, Sam Dutton, Ilmari Heikkinnen and Ade Oshineye to use the +1 button, the reverse Ken Burns effect (I like to think of it as the Monty Burns effect) and adewale_oshineye on Flickr's photos from this set: http://www.flickr.com/photos/adewale_oshineye/sets/72157627053006607/
+
+Available on the Chrome Web Store at: https://chrome.google.com/webstore/detail/eeghpjlnjoaiacgdmknkkiinijagjelk
