@@ -1,16 +1,23 @@
 {
+  "manifest_version": 3,
   "name": "GPlusTab",
-  "version": "1.5",
-  "description": "Beautiful photos hand-selected by Ade Oshineye for your New Tab. Don't forget to +1 your favourites and add me to your circles.",
+  "version": "2.0",
+  "description": "Beautiful photos hand-selected by Ade Oshineye for your New Tab.",
   "chrome_url_overrides": {
     "newtab": "flickrset.html"
   },
-  "background_page": "background.html",
+  "background": {
+    "service_worker": "background.js"
+  },
   "permissions": [
-    "http://api.flickr.com/",
-    "tabs",
+    "storage",
     "management"
   ],
-  "icons": {"48": "gplustab_48.jpg",
-            "128": "gplustab_128.jpg"}
+  "host_permissions": [
+    "https://api.flickr.com/"
+  ],
+  "icons": {
+    "48": "gplustab_48.jpg",
+    "128": "gplustab_128.jpg"
+  }
 }
