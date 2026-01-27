@@ -129,7 +129,7 @@ window.addEventListener("DOMContentLoaded", async function() {
       if (mouseX == 0) {
         mouseX = evt.pageX;
       }
-      if (!mouseX != evt.pageX) {
+      if (mouseX != evt.pageX) {
         byline.style.opacity = 1;
         // Google+ plusone element removed - no longer setting plusone.style.opacity
         document.body.onmousemove = null;
