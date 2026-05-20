@@ -1,139 +1,159 @@
 // Background service worker for GPlusTab extension
-// Manifest V3 compatible - uses chrome.storage.local instead of localStorage
-// No DOM access (service workers don't have DOM)
+// Manifest V3 compatible - uses fetch(), chrome.storage, chrome.alarms
 
 const API_KEY = "451560b07336cacb930729101ba3800f";
 const USER_SET = "72157627053006607";
 const PER_PAGE = "500";
-const shortTimeout = 500;
-const longTimeout = 5 * 60 * 1000;
-const DEBUG = false;
+const ALARM_NAME = "refreshPhotoCache";
+const CACHE_TARGET_SIZE = 30;
+const REFRESH_INTERVAL_MINUTES = 5;
 
-function log(o) {
-  if (DEBUG) console.log(o);
+// Register event listeners at the top level (MV3 requirement)
+chrome.runtime.onInstalled.addListener(handleInstalled);
+chrome.runtime.onStartup.addListener(handleStartup);
+chrome.alarms.onAlarm.addListener(handleAlarm);
+
+async function handleInstalled() {
+  await initConfig();
+  await fetchAndCachePhotos();
+  await scheduleRefresh();
 }
 
-// Initialize config options
-async function initConfig() {
-  const result = await chrome.storage.local.get(['useSmallerImages', 'showTitle', 'showOwner', 'photoCache']);
+async function handleStartup() {
+  await fetchAndCachePhotos();
+  await scheduleRefresh();
+}
 
-  // Set defaults if not already set
-  const updates = {};
-  if (result.useSmallerImages === undefined) updates.useSmallerImages = true;
-  if (result.showTitle === undefined) updates.showTitle = true;
-  if (result.showOwner === undefined) updates.showOwner = true;
-  if (result.photoCache === undefined) updates.photoCache = [];
-
-  if (Object.keys(updates).length > 0) {
-    await chrome.storage.local.set(updates);
+async function handleAlarm(alarm) {
+  if (alarm.name === ALARM_NAME) {
+    await refreshCache();
   }
 }
 
-function fetchPool(poolId, callback) {
-  const req = new XMLHttpRequest();
-  req.open(
-    "GET",
-    "https://api.flickr.com/services/rest/?" +
-      "method=flickr.groups.pools.getPhotos&" +
-      "api_key=" + API_KEY + "&" +
-      "group_id=" + poolId + "&" +
-      "extras=url_o&" +
-      "per_page=" + PER_PAGE,
-    true);
-  req.onload = function() { callback(req) };
-  req.send(null);
+async function scheduleRefresh() {
+  await chrome.alarms.create(ALARM_NAME, {
+    periodInMinutes: REFRESH_INTERVAL_MINUTES
+  });
 }
 
-function fetchSet(photosetId, callback) {
-  const req = new XMLHttpRequest();
-  req.open(
-    "GET",
-    "https://api.flickr.com/services/rest/?" +
-      "method=flickr.photosets.getPhotos&" +
-      "api_key=" + API_KEY + "&" +
-      "photoset_id=" + photosetId + "&" +
-      "extras=url_o&" +
-      "per_page=" + PER_PAGE,
-    true);
-  req.onload = function() { callback(req) };
-  req.send(null);
+async function initConfig() {
+  try {
+    const result = await chrome.storage.local.get(['useSmallerImages', 'showTitle', 'showOwner', 'photoCache']);
+    const updates = {};
+    if (result.useSmallerImages === undefined) updates.useSmallerImages = true;
+    if (result.showTitle === undefined) updates.showTitle = true;
+    if (result.showOwner === undefined) updates.showOwner = true;
+    if (result.photoCache === undefined) updates.photoCache = [];
+
+    if (Object.keys(updates).length > 0) {
+      await chrome.storage.local.set(updates);
+    }
+  } catch (error) {
+    console.error("Failed to initialize config:", error);
+  }
 }
 
-async function fillCache(req) {
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(req.responseText, "text/xml");
-  const photos = xmlDoc.getElementsByTagName("photo");
-  log("adding photos");
+async function fetchAndCachePhotos() {
+  try {
+    const photos = await fetchPhotoset(USER_SET);
+    if (photos && photos.length > 0) {
+      await buildInitialCache(photos);
+    }
+  } catch (error) {
+    console.error("Failed to fetch and cache photos:", error);
+  }
+}
 
-  // Initialize empty cache
-  await chrome.storage.local.set({ photoCache: [] });
+async function fetchPhotoset(photosetId) {
+  const url = "https://api.flickr.com/services/rest/?" +
+    "method=flickr.photosets.getPhotos&" +
+    "api_key=" + API_KEY + "&" +
+    "photoset_id=" + photosetId + "&" +
+    "extras=url_o,width_o&" +
+    "per_page=" + PER_PAGE + "&" +
+    "format=json&nojsoncallback=1";
 
-  // Start adding photos
-  async function againAndAgain() {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Flickr API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (data.stat !== "ok") {
+    throw new Error(`Flickr API returned: ${data.stat}`);
+  }
+
+  return data.photoset?.photo || [];
+}
+
+async function buildInitialCache(photos) {
+  const result = await chrome.storage.local.get(['useSmallerImages']);
+  const useSmallerImages = result.useSmallerImages !== false;
+  const photoCache = [];
+
+  // Add random photos up to target size
+  const shuffled = [...photos].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, CACHE_TARGET_SIZE);
+
+  for (const photo of selected) {
+    const cached = createCachedPhoto(photo, useSmallerImages);
+    photoCache.push(cached);
+  }
+
+  await chrome.storage.local.set({ photoCache });
+}
+
+async function refreshCache() {
+  try {
+    const photos = await fetchPhotoset(USER_SET);
+    if (!photos || photos.length === 0) return;
+
     const result = await chrome.storage.local.get(['photoCache', 'useSmallerImages']);
     const photoCache = result.photoCache || [];
+    const useSmallerImages = result.useSmallerImages !== false;
 
-    await addOnePhoto(photos, result.useSmallerImages);
-
-    if (photoCache.length < 30) {
-      setTimeout(againAndAgain, shortTimeout);
-    } else {
-      await removeOnePhoto();
-      setTimeout(againAndAgain, longTimeout);
+    // Remove oldest photo if at capacity
+    if (photoCache.length >= CACHE_TARGET_SIZE) {
+      photoCache.shift();
     }
-  }
 
-  againAndAgain();
+    // Add a random new photo
+    const randomIndex = Math.floor(Math.random() * photos.length);
+    const newPhoto = createCachedPhoto(photos[randomIndex], useSmallerImages);
+    photoCache.push(newPhoto);
+
+    await chrome.storage.local.set({ photoCache });
+  } catch (error) {
+    console.error("Failed to refresh cache:", error);
+  }
 }
 
-async function addOnePhoto(aPhotos, useSmallerImages) {
-  const whichPhoto = Math.round(Math.random() * (aPhotos.length - 1));
-  const photo = aPhotos[whichPhoto];
-  log("adding photo");
-
-  // Construct image URL without DOM preloading
-  // Service workers don't have DOM, so we just store the URL
+function createCachedPhoto(photo, useSmallerImages) {
   let imgSrc;
-  if (useSmallerImages && parseInt(photo.getAttribute("width_o")) > 1280) {
+  const widthO = parseInt(photo.width_o, 10);
+
+  if (useSmallerImages && widthO > 1280) {
     imgSrc = constructImageUrl(photo);
-  } else if (photo.getAttribute("url_o") == null || photo.getAttribute("url_o") == "") {
+  } else if (!photo.url_o) {
     imgSrc = constructImageUrl(photo);
   } else {
-    imgSrc = photo.getAttribute("url_o");
+    imgSrc = photo.url_o;
   }
 
-  const result = await chrome.storage.local.get(['photoCache']);
-  const photoCache = result.photoCache || [];
-
-  const cached = {
+  return {
     src: imgSrc,
-    title: photo.getAttribute("title"),
-    id: photo.getAttribute("id"),
+    title: photo.title,
+    id: photo.id,
     ownername: "Adewale Oshineye",
     owner: "adewale_oshineye"
   };
-
-  photoCache.push(cached);
-  await chrome.storage.local.set({ photoCache: photoCache });
-}
-
-async function removeOnePhoto() {
-  const result = await chrome.storage.local.get(['photoCache']);
-  const photoCache = result.photoCache || [];
-  photoCache.shift();
-  await chrome.storage.local.set({ photoCache: photoCache });
 }
 
 // See: https://www.flickr.com/services/api/misc.urls.html
 function constructImageUrl(photo) {
-  return "https://farm" + photo.getAttribute("farm") +
-      ".staticflickr.com/" + photo.getAttribute("server") +
-      "/" + photo.getAttribute("id") +
-      "_" + photo.getAttribute("secret") +
-      "_b.jpg";
+  return "https://farm" + photo.farm +
+    ".staticflickr.com/" + photo.server +
+    "/" + photo.id +
+    "_" + photo.secret +
+    "_b.jpg";
 }
-
-// Initialize and start fetching
-initConfig().then(() => {
-  fetchSet(USER_SET, fillCache);
-});

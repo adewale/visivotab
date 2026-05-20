@@ -1,77 +1,176 @@
 # GPlusTab — Remaining Tasks
 
-Status of the Manifest V3 migration and outstanding work, audited against Google
-Chrome's official **Modern Web Guidance** `chrome-extensions` skill
-(`GoogleChrome/modern-web-guidance`).
+Audited against Google Chrome's **Modern Web Guidance** `chrome-extensions` skill.
 
-## Done
+---
+
+## Completed
+
 - [x] Migrated `manifest.json` to Manifest V3 (`service_worker`, `host_permissions`)
 - [x] Removed all Google+ / `gapi.plusone` integration
 - [x] Moved inline scripts to external `background.js` / `flickrset.js`
 - [x] Replaced `localStorage` with `chrome.storage.local`
 - [x] Switched all URLs from HTTP to HTTPS
 - [x] Modernized CSS (removed `-webkit-` prefixes)
-- [x] Removed the `management` permission and the app-launcher feature that depended on it
+- [x] Removed the `management` permission and app-launcher feature
+- [x] Replaced `XMLHttpRequest` with `fetch()` (XHR unavailable in service workers)
+- [x] Replaced `DOMParser` / XML with Flickr JSON API (DOMParser unavailable in SW)
+- [x] Replaced `setTimeout` polling with `chrome.alarms` (SW terminates after ~30s idle)
+- [x] Use `chrome.runtime.onInstalled` / `onStartup` lifecycle events
+- [x] Added error handling with try/catch on all async operations
+- [x] Converted `.then()` chains to `async/await`
+- [x] Removed dead code (`fetchPool` was never called)
+- [x] Updated README to remove Google+ "+1 button" reference
+- [x] Added `alarms` permission to manifest
 
 ---
 
-## Critical — extension's background worker is currently broken in MV3
+## Remaining — Icons
 
-These are MV3 service-worker limitations. Each one throws at runtime, so the photo
-cache never populates. (Earlier review passes missed these because they assumed the
-service worker had DOM/legacy APIs.)
+- [ ] **Convert icons to PNG and add 16×16 size** — `manifest.json:18-21`
+      Current icons are `.jpg` and missing the 16px size. Guidance: supply real PNGs
+      at 16, 48, and 128 px, or omit `"icons"` entirely and let Chrome use a default.
 
-- [ ] **Replace `XMLHttpRequest` with `fetch()`** — `background.js:33,48`.
-      `XMLHttpRequest` does not exist in MV3 service workers; `new XMLHttpRequest()`
-      throws `ReferenceError`. Rewrite `fetchSet`/`fetchPool` using `await fetch(...)`.
-- [ ] **Replace `DOMParser` with the Flickr JSON API** — `background.js:63-65`.
-      `DOMParser` is unavailable in service workers (no DOM). Request
-      `&format=json&nojsoncallback=1` from Flickr and parse with `await res.json()`
-      instead of parsing XML.
-- [ ] **Replace the `setTimeout` polling loop with `chrome.alarms`** —
-      `background.js:79,82` (`againAndAgain`). Service workers terminate after ~30s
-      idle, so the 5-minute `longTimeout` refresh never fires. Use `chrome.alarms`
-      (min 30s interval) and add the `"alarms"` permission to `manifest.json`.
-- [ ] **Trigger work from lifecycle events, not top-level `.then()`** —
-      `background.js:137-139`. Use `chrome.runtime.onInstalled` and
-      `chrome.runtime.onStartup` to seed the cache; register listeners at the top level.
+---
 
-## High
+## Remaining — Chrome Web Store Publishing
 
-- [ ] **Convert icons to PNG and add the 16×16 size** — `manifest.json:19-22`.
-      Guidance: each icon must be a real PNG at 16, 48, and 128 px (currently `.jpg`,
-      and 16 px is missing). Either supply `icon16.png/48/128` or omit `"icons"` entirely.
-- [ ] **Add error handling to all network/async operations** — `background.js`.
-      No handling for failed Flickr requests or `storage` errors; wrap in try/catch.
-- [ ] **Use `async/await` instead of `.then()` chains** — `background.js:137`
-      (`initConfig().then(...)`). Guidance rule #5: never use `.then()` chains.
+These are required to publish on the Chrome Web Store:
 
-## Chrome Web Store readiness (from guidance "Publishing" section)
-
-- [ ] **Privacy policy** — required because the extension fetches from the Flickr API
-      and stores data via `chrome.storage`. Host it on HTTPS and link it in the dashboard.
-- [ ] **Screenshots** — at least one at 1280×800 or 640×400.
-- [ ] **Promo tile** — 440×280 small promo tile.
-- [ ] **`CHROMEWEBSTORE.md`** — single source of truth for the listing: name, version,
-      description, and a plain-English justification for the `storage` permission and the
-      `https://api.flickr.com/` host permission.
-- [ ] **Packaging** — ZIP must exclude `.git/`, `TODO.md`, `CHROMEWEBSTORE.md`, and any dev files.
+- [ ] **Privacy policy** — Required because the extension fetches from the Flickr API
+      and stores data via `chrome.storage`. Host on HTTPS, link in the developer dashboard.
+- [ ] **Screenshots** — At least one at 1280×800 or 640×400 showing the new tab in action.
+- [ ] **Promo tile** — 440×280 small promotional tile image.
+- [ ] **CHROMEWEBSTORE.md** — Single source of truth for the listing with:
+      - Name, version, description
+      - Plain-English justification for `storage` and `alarms` permissions
+      - Justification for `https://api.flickr.com/` host permission
 - [ ] **Developer account** — $5 one-time fee, 2FA enabled before publishing.
-
-## Cleanup / minor
-
-- [ ] **Remove dead code: `fetchPool`** — `background.js:32-45` is never called
-      (only `fetchSet` is used).
-- [ ] **Update README** — still references the Google+ "+1 button"; remove it.
-- [ ] **Hardcoded Flickr API key** — `background.js:5` ships a real API key in the
-      bundle. Acceptable for a personal Flickr read-only key, but note it is publicly
-      visible to anyone who inspects the extension.
+- [ ] **Package the ZIP** — Exclude `.git/`, `TODO.md`, `CHROMEWEBSTORE.md`, dev files.
 
 ---
 
-## Notes on what is already compliant
-- No `eval()` / inline scripts / inline event handlers (CSP-safe).
-- No `tabs` permission requested (the extension never reads `tab.url`/`tab.title`).
-- `host_permissions` are narrowly scoped (`https://api.flickr.com/`, not `<all_urls>`).
-- No `chrome.action` usage, so no `"action"` key is required.
-- No side panel, offscreen document, content scripts, or context menus to configure.
+## Testing
+
+### Manual Testing
+
+1. Open `chrome://extensions` in Chrome
+2. Enable "Developer mode" (top right toggle)
+3. Click "Load unpacked" and select this directory
+4. Open a new tab — should display a photo from the Flickr set
+5. Check the service worker console (click "service worker" link on the extension card)
+   for errors; verify "Flickr API" fetch succeeds and `photoCache` populates
+
+### Programmatic Testing
+
+**Unit tests** (recommended setup):
+
+```bash
+npm init -y
+npm install --save-dev vitest jest-chrome
+```
+
+Create `background.test.js`:
+```javascript
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { chrome } from 'jest-chrome';
+
+// Mock chrome APIs
+global.chrome = chrome;
+
+// Mock fetch
+global.fetch = vi.fn();
+
+describe('background service worker', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    chrome.storage.local.get.mockResolvedValue({});
+    chrome.storage.local.set.mockResolvedValue();
+    chrome.alarms.create.mockResolvedValue();
+  });
+
+  it('fetches photos from Flickr JSON API', async () => {
+    const mockResponse = {
+      stat: 'ok',
+      photoset: {
+        photo: [
+          { id: '1', title: 'Test', farm: 1, server: '1', secret: 'abc' }
+        ]
+      }
+    };
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(mockResponse)
+    });
+
+    // Import and test fetchPhotoset
+    // ... test implementation
+  });
+
+  it('stores photos in chrome.storage.local', async () => {
+    // Test that buildInitialCache calls chrome.storage.local.set
+  });
+
+  it('schedules refresh alarm', async () => {
+    // Test that scheduleRefresh creates an alarm
+    expect(chrome.alarms.create).toHaveBeenCalledWith(
+      'refreshPhotoCache',
+      { periodInMinutes: 5 }
+    );
+  });
+});
+```
+
+**Integration tests with Puppeteer**:
+
+```javascript
+import puppeteer from 'puppeteer';
+import path from 'path';
+
+const extensionPath = path.resolve(__dirname);
+
+const browser = await puppeteer.launch({
+  headless: false,
+  args: [
+    `--disable-extensions-except=${extensionPath}`,
+    `--load-extension=${extensionPath}`
+  ]
+});
+
+// Open new tab (triggers the extension)
+const page = await browser.newPage();
+await page.goto('chrome://newtab');
+
+// Verify photo loaded
+const bgDiv = await page.$('#bg img');
+expect(bgDiv).not.toBeNull();
+
+// Check storage was populated
+const storageData = await page.evaluate(() => {
+  return new Promise(resolve => {
+    chrome.storage.local.get(['photoCache'], resolve);
+  });
+});
+expect(storageData.photoCache.length).toBeGreaterThan(0);
+
+await browser.close();
+```
+
+**What to test**:
+1. `fetchPhotoset()` returns parsed photo array from Flickr JSON
+2. `buildInitialCache()` populates `chrome.storage.local` with up to 30 photos
+3. `refreshCache()` rotates photos (removes oldest, adds new)
+4. `chrome.alarms` is created with correct interval
+5. Error handling: API failures don't crash the service worker
+6. New tab page (`flickrset.js`) renders a cached photo
+
+---
+
+## Notes — Already Compliant
+
+- No `eval()` / inline scripts (CSP-safe)
+- No `tabs` permission (we don't read `tab.url` / `tab.title`)
+- `host_permissions` narrowly scoped to `https://api.flickr.com/`
+- Event listeners registered at top level of service worker
+- All chrome API calls use `async/await`
+- State persisted in `chrome.storage`, not global variables
