@@ -1,44 +1,6 @@
 // flickrset.js - New Tab page script for GPlusTab extension
 // Manifest V3 compatible - uses chrome.storage.local
 
-var getAllCallback = function(list) {
-  var apps = document.getElementById("apps");
-  var counter = 0;
-  for (var i in list) {
-    // we don't want to do anything with extensions yet.
-    var extInf = list[i];
-    if (extInf.isApp && extInf.enabled) {
-      var app = document.createElement("div");
-      var img = new Image();
-      img.className = "image";
-      img.src = find128Image(extInf.icons);
-      img.addEventListener("click", (function(ext) {
-        return function() {
-          // Note: chrome.management.launchApp() is deprecated but still functional
-          // This may stop working in future Chrome versions
-          chrome.management.launchApp(ext.id);
-        };
-      })(extInf));
-      app.className = "app";
-      app.appendChild(img);
-      apps.appendChild(app);
-    }
-  }
-};
-
-var find128Image = function(icons) {
-  for (var icon in icons) {
-    if (icons[icon].size == "128") {
-      return icons[icon].url;
-    }
-  }
-  return "/noicon.png";
-};
-
-var loadApps = function() {
-  chrome.management.getAll(getAllCallback);
-};
-
 // Escape HTML special characters properly (replaces all occurrences)
 function escapeHtml(text) {
   if (!text) return '';
@@ -49,8 +11,6 @@ function escapeHtml(text) {
 }
 
 window.addEventListener("DOMContentLoaded", async function() {
-  loadApps();
-
   // Use chrome.storage.local instead of localStorage
   const result = await chrome.storage.local.get(['photoCache', 'showTitle', 'showOwner']);
   const cachedImages = result.photoCache || [];
