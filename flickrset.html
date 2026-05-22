@@ -13,8 +13,8 @@
     background-color: rgba(255,255,255,1);
     color: #666;
     opacity: 0;
-    -webkit-transition-property: opacity;
-    -webkit-transition-duration: 0.8s;
+    transition-property: opacity;
+    transition-duration: 0.8s;
     padding: 0.4em;
     border-radius: 0.3em;
     padding-left: 2em;
@@ -25,14 +25,6 @@
     display: inline-block;
     vertical-align:middle;
     border: 1px solid #ccc;
-  }
-  #plusone {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    opacity: 0;
-    -webkit-transition-property: opacity;
-    -webkit-transition-duration: 0.8s;
   }
   a:link, a:visited {
     color: #333;
@@ -45,48 +37,12 @@
     font-size: small;
   }
 
-  #container {
-    overflow: scroll;
-    position: absolute;
-    left: 10px;
-    bottom: 10px;
-    top: 44px;
-    background-color: rgba(0, 0, 0, 0.4);
-    box-shadow: 0px 0px 5px #000;
-    opacity: 0;
-    padding: 10px;
-    -webkit-perspective: 400;
-    -webkit-transform-style: preserve-3d;
-    -webkit-transition-property: -webkit-transform opacity;
-    -webkit-transition-duration: 0.5s;
-    -webkit-transform: translateX(-15px) translateZ(150px) rotateY(25deg);
-    -webkit-transform-origin: 50% 50%;
-  }
-
-  #apps {
-    height: 100%;
-    color: white;
-    font-family: Arial;
-    -webkit-transform-style: preserve-3d;
-  }
-
-  #container:hover {
-    opacity: 1;
-    -webkit-transform: translateX(0px) translateZ(0px) rotateY(0deg);
-  }
-
-  ::-webkit-scrollbar {
-    width: 0px;
-    height: 0px;
-    opacity: 0;
-  }
-
   #stage {
     position: absolute;
     top: 0px;
     left: 0px;
-    -webkit-transform-style: preserve-3d;
-    -webkit-perspective: 800;
+    transform-style: preserve-3d;
+    perspective: 800px;
   }
   #bg {
     position: absolute;
@@ -94,146 +50,29 @@
     left: 0px;
     width: 100%;
     height: 100%;
-    -webkit-transform-origin: 50% 50%;
-    -webkit-transition-property: -webkit-transform;
-    -webkit-transform: scale(1.2);
-    -webkit-transform-style: preserve-3d;
-    -webkit-transition-duration: 10s;
+    transform-origin: 50% 50%;
+    transition-property: transform;
+    transform: scale(1.2);
+    transform-style: preserve-3d;
+    transition-duration: 10s;
     overflow: hidden;
   }
   #bg img {
     position: absolute;
     top: 0px;
     left: 0px;
-    -webkit-transform-origin: 0% 0%;
+    transform-origin: 0% 0%;
     opacity: 0;
-    -webkit-transition-property: opacity;
-    -webkit-transition-duration: 1s;
+    transition-property: opacity;
+    transition-duration: 1s;
   }
   body {
     overflow: hidden;
   }
 
-</style >
+</style>
 
-<script>
-var getAllCallback = function(list) {
-        var apps = document.getElementById("apps");
-        var counter = 0;
-        for (var i in list) {
-            // we don't want to do anything with extensions yet.
-            var extInf = list[i];
-            if (extInf.isApp && extInf.enabled) {
-                var app = document.createElement("div");
-                var img = new Image();
-                img.className = "image";
-                img.src = find128Image(extInf.icons);
-                img.addEventListener("click", (function(ext) {
-                    return function() {
-                        chrome.management.launchApp(ext.id);
-                    };
-                })(extInf));
-                app.className = "app";
-                app.appendChild(img);
-                apps.appendChild(app);
-            }
-        }
-    };
-
-var find128Image = function(icons) {
-        for (var icon in icons) {
-            if (icons[icon].size == "128") {
-                return icons[icon].url;
-            }
-        }
-        return "/noicon.png";
-    };
-
-var loadApps = function() {
-        chrome.management.getAll(getAllCallback);
-    };
-
-window.addEventListener("DOMContentLoaded", function() {
-    loadApps();
-
-    var cachedImages = JSON.parse(localStorage["photoCache"]);
-    var whichImage = Math.round(Math.random() * (cachedImages.length - 1));
-    var cached = cachedImages[whichImage];
-    var bg = document.getElementById('bg');
-    bg.style.width = window.innerWidth + 'px';
-    bg.style.height = window.innerHeight + 'px';
-    var img = new Image();
-    img.onload = function() {
-      window.onresize();
-      img.style.opacity = 1;
-    };
-    window.onresize = function() {
-      bg.style.width = window.innerWidth + 'px';
-      bg.style.height = window.innerHeight + 'px';
-      var f = Math.max(window.innerWidth/img.width, window.innerHeight/img.height);
-      img.style.webkitTransform = 'scale('+f+')';
-      img.style.left = (window.innerWidth - img.width*f) / 2 + 'px';
-      img.style.top = (window.innerHeight- img.height*f) / 2 + 'px';
-    };
-    img.src = cached.src;
-    bg.appendChild(img);
-    var tgtX = 25+Math.floor(Math.random()*3) * 25 + '%';
-    var tgtY = 25+Math.floor(Math.random()*3) * 25 + '%';
-    bg.style.webkitTransformOrigin = tgtX + ' ' + tgtY;
-    bg.style.webkitTransform = 'scale(1.0)';
-    var byline = document.getElementById("wrapper");
-    byline.href = 'http://www.flickr.com/photos/' + cached.owner + '/' + cached.id;
-    var link = document.createElement("link");
-    link.rel = "canonical";
-    link.href = byline.href;
-    document.head.appendChild(link);
-
-    var plusone = document.getElementById('plusone');
-
-    gapi.plusone.go();
-
-    if (localStorage['showTitle']) {
-        var title = document.createElement("span");
-        title.setAttribute("class", "title");
-        if (cached.title) {
-            var escapedTitle = cached.title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
-            title.innerHTML = escapedTitle + " by ";
-        }
-        else {
-            title.innerHTML = "by ";
-        }
-        byline.appendChild(title);
-        if (localStorage['showOwner']) {
-            var owner = document.createElement("span");
-            owner.setAttribute("class", "owner");
-            var escapedOwnername = cached.ownername.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
-            owner.innerHTML = escapedOwnername;
-            byline.appendChild(owner);
-        }
-    }
-    else {
-        byline.innerHTML = "View in photostream";
-    }
-    window.onbeforeunload = function() {
-        document.body.onmousemove = null;
-    }
-    window.setTimeout(function() {
-        var mouseX = 0;
-        document.body.onmousemove = function(evt) {
-            if (mouseX == 0) {
-                mouseX = evt.pageX;
-            }
-            if (!mouseX != evt.pageX) {
-                byline.style.opacity = 1;
-                plusone.style.opacity = 1;
-                document.body.onmousemove = null;
-            }
-        }
-    }, 200);
-}, false);
-
-</script>
-
+<script src="flickrset.js"></script>
 
 </head>
     <body>
@@ -243,12 +82,5 @@ window.addEventListener("DOMContentLoaded", function() {
       <div id="byline">
         <a href="#" id="wrapper"></a>
       </div>
-      <div id="plusone">
-        <script type="text/javascript" src="https://apis.google.com/js/plusone.js">
-          {parsetags: 'explicit'}
-        </script>
-       <div class="g-plusone" data-size="standard" data-count="true"></div>
-      </div>
-      <div id="container"><div id="apps"> </div></div>
     </body>
 </html>
