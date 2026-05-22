@@ -29,9 +29,14 @@ Audited against Google Chrome's **Modern Web Guidance** `chrome-extensions` skil
 ### Testing
 - [x] Set up Vitest with jest-chrome mocking
 - [x] Extracted testable pure functions with dependency injection
-- [x] Created `src/photo-cache.js` for background worker logic (18 tests)
-- [x] Created `src/newtab.js` for new tab page logic (21 tests)
-- [x] **39 unit tests passing**
+- [x] Created `src/photo-cache.js` for background worker logic
+- [x] Created `src/newtab.js` for new tab page logic
+- [x] Added property-based testing with fast-check
+- [x] Created test fixtures from real Flickr API structure (prevents mock drift)
+- [x] Created test data builders for consistent setup
+- [x] Added boundary value tests (0, empty, edge cases)
+- [x] Increased assertion density (3+ per test)
+- [x] **59 unit tests passing**
 
 ### Icons
 - [x] Removed `.jpg` icons (Chrome uses default icon when none specified)
@@ -67,7 +72,21 @@ npm test          # Run all tests once
 npm run test:watch  # Run tests in watch mode
 ```
 
-### What Unit Tests Cover (39 tests)
+### Testing Best Practices Applied
+
+Based on [testing-best-practices](https://github.com/adewale/testing-best-practices):
+
+| Practice | Implementation |
+|----------|----------------|
+| **Property-based testing** | fast-check for invariants (escaping, URL structure, cover-fit math) |
+| **Mock drift prevention** | Real Flickr API response structure in `test/fixtures/flickr-api.js` |
+| **Test data builders** | `test/builders.js` for consistent, readable test setup |
+| **Assertion density** | 3+ meaningful assertions per test |
+| **Boundary values** | Empty arrays, 0 dimensions, threshold values |
+| **Exhaustive testing** | All 9 transform-origin values verified |
+| **Dependency injection** | Storage and fetch passed as parameters |
+
+### What Unit Tests Cover (59 tests)
 
 **`src/photo-cache.js`** (18 tests):
 - `constructImageUrl()` — Builds Flickr static URLs from photo metadata

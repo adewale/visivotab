@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import fc from 'fast-check';
 import {
   escapeHtml,
   selectRandomPhoto,
@@ -6,163 +7,376 @@ import {
   buildFlickrPhotoUrl,
   pickRandomTransformOrigin
 } from '../src/newtab.js';
+import { buildCachedPhoto, resetBuilders } from './builders.js';
 
 describe('escapeHtml', () => {
-  it('returns empty string for null input', () => {
-    expect(escapeHtml(null)).toBe('');
+  describe('null/empty handling', () => {
+    it('returns empty string for null', () => {
+      expect(escapeHtml(null)).toBe('');
+    });
+
+    it('returns empty string for undefined', () => {
+      expect(escapeHtml(undefined)).toBe('');
+    });
+
+    it('returns empty string for empty string', () => {
+      expect(escapeHtml('')).toBe('');
+    });
   });
 
-  it('returns empty string for undefined input', () => {
-    expect(escapeHtml(undefined)).toBe('');
+  describe('character escaping', () => {
+    it('escapes all HTML-sensitive characters', () => {
+      const input = '<script>alert("XSS & attack")</script>';
+      const output = escapeHtml(input);
+
+      expect(output).not.toContain('<');
+      expect(output).not.toContain('>');
+      expect(output).toContain('&lt;');
+      expect(output).toContain('&gt;');
+      expect(output).toContain('&amp;');
+    });
+
+    it('escapes ALL occurrences, not just first', () => {
+      const input = '<a><b><c>';
+      const output = escapeHtml(input);
+
+      expect(output).toBe('&lt;a&gt;&lt;b&gt;&lt;c&gt;');
+      expect((output.match(/&lt;/g) || []).length).toBe(3);
+      expect((output.match(/&gt;/g) || []).length).toBe(3);
+    });
   });
 
-  it('returns empty string for empty string input', () => {
-    expect(escapeHtml('')).toBe('');
+  // Property: escaping is idempotent after first application
+  it('double-escaping produces different output (not idempotent)', () => {
+    const input = '<test>';
+    const once = escapeHtml(input);
+    const twice = escapeHtml(once);
+
+    // &lt; becomes &amp;lt; on second pass
+    expect(twice).not.toBe(once);
+    expect(twice).toContain('&amp;lt;');
   });
 
-  it('escapes ampersands', () => {
-    expect(escapeHtml('A & B')).toBe('A &amp; B');
+  // Property: safe strings pass through unchanged
+  it('leaves safe strings unchanged', () => {
+    fc.assert(
+      fc.property(
+        fc.stringMatching(/^[a-zA-Z0-9 .,!?-]*$/),
+        (safeString) => {
+          return escapeHtml(safeString) === safeString;
+        }
+      )
+    );
   });
 
-  it('escapes less-than signs', () => {
-    expect(escapeHtml('A < B')).toBe('A &lt; B');
+  // Property: output never contains unescaped dangerous chars
+  it('output never contains raw < or > characters', () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        (input) => {
+          const output = escapeHtml(input);
+          return !output.includes('<') && !output.includes('>');
+        }
+      )
+    );
   });
 
-  it('escapes greater-than signs', () => {
-    expect(escapeHtml('A > B')).toBe('A &gt; B');
-  });
-
-  it('escapes all occurrences, not just the first', () => {
-    expect(escapeHtml('A & B & C')).toBe('A &amp; B &amp; C');
-  });
-
-  it('escapes multiple different characters', () => {
-    expect(escapeHtml('<script>alert("XSS")</script>')).toBe('&lt;script&gt;alert("XSS")&lt;/script&gt;');
-  });
-
-  it('handles text with no special characters', () => {
-    expect(escapeHtml('Hello World')).toBe('Hello World');
+  // Property: escaping preserves string length or increases it
+  it('escaped string is never shorter than input', () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        (input) => {
+          const output = escapeHtml(input);
+          return output.length >= (input?.length || 0);
+        }
+      )
+    );
   });
 });
 
 describe('selectRandomPhoto', () => {
-  it('returns a photo from the array', () => {
-    const photos = [
-      { id: '1', src: 'a.jpg' },
-      { id: '2', src: 'b.jpg' },
-      { id: '3', src: 'c.jpg' }
-    ];
+  beforeEach(() => resetBuilders());
 
-    const selected = selectRandomPhoto(photos);
+  describe('edge cases', () => {
+    it('returns null for null input', () => {
+      expect(selectRandomPhoto(null)).toBeNull();
+    });
 
-    expect(photos).toContainEqual(selected);
+    it('returns null for undefined input', () => {
+      expect(selectRandomPhoto(undefined)).toBeNull();
+    });
+
+    it('returns null for empty array', () => {
+      expect(selectRandomPhoto([])).toBeNull();
+    });
   });
 
-  it('returns the only photo when array has one element', () => {
-    const photos = [{ id: '1', src: 'a.jpg' }];
+  it('returns the only element for single-element array', () => {
+    const photo = buildCachedPhoto();
+    const selected = selectRandomPhoto([photo]);
 
-    const selected = selectRandomPhoto(photos);
-
-    expect(selected).toEqual(photos[0]);
+    expect(selected).toBe(photo); // Same reference
+    expect(selected.id).toBe(photo.id);
   });
 
-  it('returns null for empty array', () => {
-    expect(selectRandomPhoto([])).toBeNull();
+  it('always returns an element from the input array', () => {
+    const photos = [buildCachedPhoto(), buildCachedPhoto(), buildCachedPhoto()];
+
+    for (let i = 0; i < 100; i++) {
+      const selected = selectRandomPhoto(photos);
+      expect(photos).toContain(selected);
+    }
   });
 
-  it('returns null for null input', () => {
-    expect(selectRandomPhoto(null)).toBeNull();
+  // Property: selection is uniform (statistical)
+  it('selects from entire array over many iterations', () => {
+    const photos = Array.from({ length: 5 }, () => buildCachedPhoto());
+    const selections = new Map();
+
+    for (let i = 0; i < 500; i++) {
+      const selected = selectRandomPhoto(photos);
+      selections.set(selected.id, (selections.get(selected.id) || 0) + 1);
+    }
+
+    // Each photo should be selected at least once in 500 tries
+    expect(selections.size).toBe(5);
+    for (const count of selections.values()) {
+      expect(count).toBeGreaterThan(10); // Statistically likely
+    }
   });
 });
 
 describe('calculateImageTransform', () => {
-  it('scales image to cover window when image is smaller', () => {
-    const result = calculateImageTransform({
-      imgWidth: 800,
-      imgHeight: 600,
-      windowWidth: 1600,
-      windowHeight: 1200
+  describe('cover behavior (always fills window)', () => {
+    it('scales up small image to cover window', () => {
+      const result = calculateImageTransform({
+        imgWidth: 100,
+        imgHeight: 100,
+        windowWidth: 200,
+        windowHeight: 200
+      });
+
+      expect(result.scale).toBe(2);
+      expect(result.left).toBe(0);
+      expect(result.top).toBe(0);
     });
 
-    expect(result.scale).toBe(2);
-    expect(result.left).toBe(0);
-    expect(result.top).toBe(0);
+    it('scales down large image to cover window', () => {
+      const result = calculateImageTransform({
+        imgWidth: 1000,
+        imgHeight: 1000,
+        windowWidth: 500,
+        windowHeight: 500
+      });
+
+      expect(result.scale).toBe(0.5);
+    });
+
+    // Property: scaled image always covers window
+    it('scaled image always covers entire window', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            imgWidth: fc.integer({ min: 100, max: 5000 }),
+            imgHeight: fc.integer({ min: 100, max: 5000 }),
+            windowWidth: fc.integer({ min: 100, max: 3000 }),
+            windowHeight: fc.integer({ min: 100, max: 2000 })
+          }),
+          (dims) => {
+            const result = calculateImageTransform(dims);
+            const scaledWidth = dims.imgWidth * result.scale;
+            const scaledHeight = dims.imgHeight * result.scale;
+
+            // Scaled image must be >= window in both dimensions
+            return (
+              scaledWidth >= dims.windowWidth - 0.001 &&
+              scaledHeight >= dims.windowHeight - 0.001
+            );
+          }
+        )
+      );
+    });
   });
 
-  it('scales image to cover window when image is larger', () => {
-    const result = calculateImageTransform({
-      imgWidth: 1600,
-      imgHeight: 1200,
-      windowWidth: 800,
-      windowHeight: 600
+  describe('centering behavior', () => {
+    it('centers image when aspect ratios match', () => {
+      const result = calculateImageTransform({
+        imgWidth: 800,
+        imgHeight: 600,
+        windowWidth: 800,
+        windowHeight: 600
+      });
+
+      expect(result.scale).toBe(1);
+      expect(result.left).toBe(0);
+      expect(result.top).toBe(0);
     });
 
-    expect(result.scale).toBe(0.5);
+    it('centers horizontally for wide image in narrow window', () => {
+      const result = calculateImageTransform({
+        imgWidth: 1000,
+        imgHeight: 500,
+        windowWidth: 800,
+        windowHeight: 600
+      });
+
+      // Scale = 1.2 (to cover height)
+      // Scaled width = 1200, left = (800 - 1200) / 2 = -200
+      expect(result.left).toBe(-200);
+      expect(result.top).toBe(0);
+    });
+
+    it('centers vertically for tall image in wide window', () => {
+      const result = calculateImageTransform({
+        imgWidth: 500,
+        imgHeight: 1000,
+        windowWidth: 800,
+        windowHeight: 600
+      });
+
+      // Scale = 1.6 (to cover width)
+      // Scaled height = 1600, top = (600 - 1600) / 2 = -500
+      expect(result.scale).toBe(1.6);
+      expect(result.left).toBe(0);
+      expect(result.top).toBe(-500);
+    });
+
+    // Property: image is always centered
+    it('image center aligns with window center', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            imgWidth: fc.integer({ min: 100, max: 5000 }),
+            imgHeight: fc.integer({ min: 100, max: 5000 }),
+            windowWidth: fc.integer({ min: 100, max: 3000 }),
+            windowHeight: fc.integer({ min: 100, max: 2000 })
+          }),
+          (dims) => {
+            const result = calculateImageTransform(dims);
+            const scaledWidth = dims.imgWidth * result.scale;
+            const scaledHeight = dims.imgHeight * result.scale;
+
+            // Image center should equal window center
+            const imgCenterX = result.left + scaledWidth / 2;
+            const imgCenterY = result.top + scaledHeight / 2;
+            const winCenterX = dims.windowWidth / 2;
+            const winCenterY = dims.windowHeight / 2;
+
+            return (
+              Math.abs(imgCenterX - winCenterX) < 0.01 &&
+              Math.abs(imgCenterY - winCenterY) < 0.01
+            );
+          }
+        )
+      );
+    });
   });
 
-  it('handles landscape window with portrait image', () => {
-    const result = calculateImageTransform({
-      imgWidth: 600,
-      imgHeight: 800,
-      windowWidth: 1200,
-      windowHeight: 600
+  describe('boundary values', () => {
+    it('handles very small dimensions', () => {
+      const result = calculateImageTransform({
+        imgWidth: 1,
+        imgHeight: 1,
+        windowWidth: 1920,
+        windowHeight: 1080
+      });
+
+      expect(result.scale).toBe(1920);
+      expect(Number.isFinite(result.left)).toBe(true);
+      expect(Number.isFinite(result.top)).toBe(true);
     });
 
-    // Window aspect: 2:1, Image aspect: 3:4
-    // Scale by width: 1200/600 = 2, gives height 1600 (covers 600)
-    // Scale by height: 600/800 = 0.75, gives width 450 (doesn't cover 1200)
-    // Should use scale 2
-    expect(result.scale).toBe(2);
-  });
+    it('handles equal dimensions', () => {
+      const result = calculateImageTransform({
+        imgWidth: 500,
+        imgHeight: 500,
+        windowWidth: 500,
+        windowHeight: 500
+      });
 
-  it('centers the image horizontally and vertically', () => {
-    const result = calculateImageTransform({
-      imgWidth: 1000,
-      imgHeight: 500,
-      windowWidth: 800,
-      windowHeight: 600
+      expect(result.scale).toBe(1);
+      expect(result.left).toBe(0);
+      expect(result.top).toBe(0);
     });
-
-    // Scale = max(800/1000, 600/500) = max(0.8, 1.2) = 1.2
-    // Scaled width = 1000 * 1.2 = 1200
-    // Scaled height = 500 * 1.2 = 600
-    // Left = (800 - 1200) / 2 = -200
-    // Top = (600 - 600) / 2 = 0
-    expect(result.scale).toBe(1.2);
-    expect(result.left).toBe(-200);
-    expect(result.top).toBe(0);
   });
 });
 
 describe('buildFlickrPhotoUrl', () => {
-  it('builds correct Flickr photo URL', () => {
-    const url = buildFlickrPhotoUrl('john_doe', '12345');
+  it('constructs correct URL structure', () => {
+    const url = buildFlickrPhotoUrl('user123', 'photo456');
 
-    expect(url).toBe('https://www.flickr.com/photos/john_doe/12345');
+    expect(url).toBe('https://www.flickr.com/photos/user123/photo456');
+    expect(url).toMatch(/^https:\/\/www\.flickr\.com\/photos\//);
   });
 
-  it('handles owner with underscores', () => {
-    const url = buildFlickrPhotoUrl('adewale_oshineye', '67890');
+  it('handles special characters in owner name', () => {
+    const url = buildFlickrPhotoUrl('adewale_oshineye', '12345');
 
-    expect(url).toBe('https://www.flickr.com/photos/adewale_oshineye/67890');
+    expect(url).toContain('adewale_oshineye');
+    expect(url).toBe('https://www.flickr.com/photos/adewale_oshineye/12345');
+  });
+
+  // Property: URL always has correct structure
+  it('always produces valid Flickr URL structure', () => {
+    fc.assert(
+      fc.property(
+        fc.tuple(
+          fc.stringMatching(/^[a-zA-Z0-9_]+$/),
+          fc.stringMatching(/^\d+$/)
+        ),
+        ([owner, photoId]) => {
+          const url = buildFlickrPhotoUrl(owner, photoId);
+          return (
+            url.startsWith('https://www.flickr.com/photos/') &&
+            url.includes(owner) &&
+            url.includes(photoId)
+          );
+        }
+      )
+    );
   });
 });
 
 describe('pickRandomTransformOrigin', () => {
-  it('returns a valid CSS transform-origin value', () => {
+  it('returns valid CSS transform-origin value', () => {
     const origin = pickRandomTransformOrigin();
 
-    // Should be "X% Y%" format where X and Y are 25, 50, or 75
     expect(origin).toMatch(/^(25|50|75)% (25|50|75)%$/);
   });
 
-  it('returns different values over multiple calls (statistical)', () => {
-    const origins = new Set();
-    for (let i = 0; i < 50; i++) {
-      origins.add(pickRandomTransformOrigin());
+  // Exhaustive: all 9 possible values can be generated
+  it('can generate all 9 possible combinations', () => {
+    const allOrigins = new Set();
+    const expectedOrigins = [
+      '25% 25%', '25% 50%', '25% 75%',
+      '50% 25%', '50% 50%', '50% 75%',
+      '75% 25%', '75% 50%', '75% 75%'
+    ];
+
+    // Run many times to collect all possibilities
+    for (let i = 0; i < 1000; i++) {
+      allOrigins.add(pickRandomTransformOrigin());
     }
 
-    // With 9 possible combinations, 50 calls should produce at least 2 different values
-    expect(origins.size).toBeGreaterThan(1);
+    expect(allOrigins.size).toBe(9);
+    for (const expected of expectedOrigins) {
+      expect(allOrigins.has(expected)).toBe(true);
+    }
+  });
+
+  // Property: output always matches expected format
+  it('output always matches expected format', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 100 }), // ignored, just for iterations
+        () => {
+          const origin = pickRandomTransformOrigin();
+          return /^(25|50|75)% (25|50|75)%$/.test(origin);
+        }
+      ),
+      { numRuns: 100 }
+    );
   });
 });
