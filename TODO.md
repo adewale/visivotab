@@ -6,6 +6,7 @@ Audited against Google Chrome's **Modern Web Guidance** `chrome-extensions` skil
 
 ## Completed
 
+### Core Migration
 - [x] Migrated `manifest.json` to Manifest V3 (`service_worker`, `host_permissions`)
 - [x] Removed all Google+ / `gapi.plusone` integration
 - [x] Moved inline scripts to external `background.js` / `flickrset.js`
@@ -13,7 +14,9 @@ Audited against Google Chrome's **Modern Web Guidance** `chrome-extensions` skil
 - [x] Switched all URLs from HTTP to HTTPS
 - [x] Modernized CSS (removed `-webkit-` prefixes)
 - [x] Removed the `management` permission and app-launcher feature
-- [x] Replaced `XMLHttpRequest` with `fetch()` (XHR unavailable in service workers)
+
+### Service Worker Fixes
+- [x] Replaced `XMLHttpRequest` with `fetch()` (XHR unavailable in SW)
 - [x] Replaced `DOMParser` / XML with Flickr JSON API (DOMParser unavailable in SW)
 - [x] Replaced `setTimeout` polling with `chrome.alarms` (SW terminates after ~30s idle)
 - [x] Use `chrome.runtime.onInstalled` / `onStartup` lifecycle events
@@ -23,13 +26,16 @@ Audited against Google Chrome's **Modern Web Guidance** `chrome-extensions` skil
 - [x] Updated README to remove Google+ "+1 button" reference
 - [x] Added `alarms` permission to manifest
 
----
+### Testing
+- [x] Set up Vitest with jest-chrome mocking
+- [x] Extracted testable pure functions with dependency injection
+- [x] Created `src/photo-cache.js` for background worker logic (18 tests)
+- [x] Created `src/newtab.js` for new tab page logic (21 tests)
+- [x] **39 unit tests passing**
 
-## Remaining — Icons
-
-- [ ] **Convert icons to PNG and add 16×16 size** — `manifest.json:18-21`
-      Current icons are `.jpg` and missing the 16px size. Guidance: supply real PNGs
-      at 16, 48, and 128 px, or omit `"icons"` entirely and let Chrome use a default.
+### Icons
+- [x] Removed `.jpg` icons (Chrome uses default icon when none specified)
+- [ ] **Optional**: Add proper PNG icons at 16/48/128px if custom branding desired
 
 ---
 
@@ -40,96 +46,63 @@ These are required to publish on the Chrome Web Store:
 - [ ] **Privacy policy** — Required because the extension fetches from the Flickr API
       and stores data via `chrome.storage`. Host on HTTPS, link in the developer dashboard.
 - [ ] **Screenshots** — At least one at 1280×800 or 640×400 showing the new tab in action.
+      (Note: `gplustab_screenshot.jpg` exists at 1280×800 — may need updating)
 - [ ] **Promo tile** — 440×280 small promotional tile image.
 - [ ] **CHROMEWEBSTORE.md** — Single source of truth for the listing with:
       - Name, version, description
       - Plain-English justification for `storage` and `alarms` permissions
       - Justification for `https://api.flickr.com/` host permission
 - [ ] **Developer account** — $5 one-time fee, 2FA enabled before publishing.
-- [ ] **Package the ZIP** — Exclude `.git/`, `TODO.md`, `CHROMEWEBSTORE.md`, dev files.
+- [ ] **Package the ZIP** — Exclude `.git/`, `node_modules/`, `TODO.md`, `CHROMEWEBSTORE.md`,
+      `test/`, `src/`, `package.json`, `vitest.config.js`.
 
 ---
 
-## Testing
+## Testing Guide
 
-### Manual Testing
-
-1. Open `chrome://extensions` in Chrome
-2. Enable "Developer mode" (top right toggle)
-3. Click "Load unpacked" and select this directory
-4. Open a new tab — should display a photo from the Flickr set
-5. Check the service worker console (click "service worker" link on the extension card)
-   for errors; verify "Flickr API" fetch succeeds and `photoCache` populates
-
-### Programmatic Testing
-
-**Unit tests** (recommended setup):
+### Run Unit Tests
 
 ```bash
-npm init -y
-npm install --save-dev vitest jest-chrome
+npm test          # Run all tests once
+npm run test:watch  # Run tests in watch mode
 ```
 
-Create `background.test.js`:
-```javascript
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { chrome } from 'jest-chrome';
+### What Unit Tests Cover (39 tests)
 
-// Mock chrome APIs
-global.chrome = chrome;
+**`src/photo-cache.js`** (18 tests):
+- `constructImageUrl()` — Builds Flickr static URLs from photo metadata
+- `createCachedPhoto()` — Creates cache entries with size optimization logic
+- `fetchPhotoset()` — Fetches and parses Flickr JSON API (with injected fetch)
+- `buildInitialCache()` — Populates storage with shuffled photos (with injected storage)
+- `refreshCache()` — Rotates cache: removes oldest, adds new (with injected deps)
 
-// Mock fetch
-global.fetch = vi.fn();
+**`src/newtab.js`** (21 tests):
+- `escapeHtml()` — XSS prevention for user-generated content
+- `selectRandomPhoto()` — Random selection from photo array
+- `calculateImageTransform()` — Cover-fit scaling math for background images
+- `buildFlickrPhotoUrl()` — Constructs photo page URLs
+- `pickRandomTransformOrigin()` — Ken Burns effect origin points
 
-describe('background service worker', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    chrome.storage.local.get.mockResolvedValue({});
-    chrome.storage.local.set.mockResolvedValue();
-    chrome.alarms.create.mockResolvedValue();
-  });
+### What Can Be Tested Without a Browser
 
-  it('fetches photos from Flickr JSON API', async () => {
-    const mockResponse = {
-      stat: 'ok',
-      photoset: {
-        photo: [
-          { id: '1', title: 'Test', farm: 1, server: '1', secret: 'abc' }
-        ]
-      }
-    };
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockResponse)
-    });
+| Category | Testable | How |
+|----------|----------|-----|
+| Pure functions | ✅ Yes | Direct unit tests |
+| API parsing | ✅ Yes | Mock `fetch`, test response handling |
+| Storage logic | ✅ Yes | Inject mock storage object |
+| Error handling | ✅ Yes | Mock failures, verify graceful handling |
+| DOM manipulation | ❌ No | Requires browser/jsdom |
+| Chrome APIs | ❌ No | Requires browser extension context |
+| Visual rendering | ❌ No | Requires browser |
 
-    // Import and test fetchPhotoset
-    // ... test implementation
-  });
+### What Playwright Can Test (Integration/E2E)
 
-  it('stores photos in chrome.storage.local', async () => {
-    // Test that buildInitialCache calls chrome.storage.local.set
-  });
-
-  it('schedules refresh alarm', async () => {
-    // Test that scheduleRefresh creates an alarm
-    expect(chrome.alarms.create).toHaveBeenCalledWith(
-      'refreshPhotoCache',
-      { periodInMinutes: 5 }
-    );
-  });
-});
-```
-
-**Integration tests with Puppeteer**:
+Playwright can load the extension in a real Chromium instance:
 
 ```javascript
-import puppeteer from 'puppeteer';
-import path from 'path';
+import { chromium } from 'playwright';
 
-const extensionPath = path.resolve(__dirname);
-
-const browser = await puppeteer.launch({
+const browser = await chromium.launchPersistentContext('', {
   headless: false,
   args: [
     `--disable-extensions-except=${extensionPath}`,
@@ -137,40 +110,112 @@ const browser = await puppeteer.launch({
   ]
 });
 
-// Open new tab (triggers the extension)
-const page = await browser.newPage();
-await page.goto('chrome://newtab');
-
-// Verify photo loaded
-const bgDiv = await page.$('#bg img');
-expect(bgDiv).not.toBeNull();
-
-// Check storage was populated
-const storageData = await page.evaluate(() => {
-  return new Promise(resolve => {
-    chrome.storage.local.get(['photoCache'], resolve);
-  });
-});
-expect(storageData.photoCache.length).toBeGreaterThan(0);
-
-await browser.close();
+// Test scenarios Playwright CAN verify:
 ```
 
-**What to test**:
-1. `fetchPhotoset()` returns parsed photo array from Flickr JSON
-2. `buildInitialCache()` populates `chrome.storage.local` with up to 30 photos
-3. `refreshCache()` rotates photos (removes oldest, adds new)
-4. `chrome.alarms` is created with correct interval
-5. Error handling: API failures don't crash the service worker
-6. New tab page (`flickrset.js`) renders a cached photo
+| Scenario | How to Test |
+|----------|-------------|
+| Extension loads without errors | Check service worker status, no console errors |
+| New tab displays a photo | Navigate to `chrome://newtab`, assert `#bg img` exists |
+| Photo cache populates | Query `chrome.storage.local`, assert `photoCache.length > 0` |
+| Byline shows photo info | Assert `#wrapper` contains title/owner text |
+| Click opens Flickr | Click byline, assert navigation to flickr.com |
+| Mouse movement reveals byline | Simulate mouse move, assert `#wrapper` opacity changes |
+| Window resize recalculates | Resize viewport, verify image transform updates |
+| Alarm triggers refresh | Use `chrome.alarms.create` with short delay, verify cache updates |
+
+**Playwright Limitations for Extensions**:
+- Cannot directly access `chrome.*` APIs from test code
+- Must use `page.evaluate()` to interact with extension context
+- Cannot test service worker lifecycle directly (use DevTools Protocol)
+- `chrome://newtab` may redirect; use extension's own HTML path instead
+
+### Example Playwright Test
+
+```javascript
+// test/e2e/extension.spec.js
+import { test, expect, chromium } from '@playwright/test';
+import path from 'path';
+
+const extensionPath = path.resolve(__dirname, '../../');
+
+test.describe('GPlusTab Extension', () => {
+  let context;
+  let page;
+
+  test.beforeAll(async () => {
+    context = await chromium.launchPersistentContext('', {
+      headless: false,
+      args: [
+        `--disable-extensions-except=${extensionPath}`,
+        `--load-extension=${extensionPath}`
+      ]
+    });
+  });
+
+  test.afterAll(async () => {
+    await context.close();
+  });
+
+  test('displays photo on new tab', async () => {
+    page = await context.newPage();
+    await page.goto('file://' + path.join(extensionPath, 'flickrset.html'));
+
+    // Wait for image to load (may take time for API fetch on first run)
+    await page.waitForSelector('#bg img', { timeout: 10000 });
+
+    const img = await page.$('#bg img');
+    expect(img).not.toBeNull();
+
+    const src = await img.getAttribute('src');
+    expect(src).toContain('flickr');
+  });
+
+  test('shows byline on mouse movement', async () => {
+    page = await context.newPage();
+    await page.goto('file://' + path.join(extensionPath, 'flickrset.html'));
+    await page.waitForSelector('#bg img', { timeout: 10000 });
+
+    // Initially hidden
+    const initialOpacity = await page.$eval('#wrapper', el =>
+      getComputedStyle(el).opacity
+    );
+    expect(initialOpacity).toBe('0');
+
+    // Move mouse
+    await page.mouse.move(100, 100);
+    await page.mouse.move(200, 100);
+
+    // Should become visible
+    await page.waitForFunction(() =>
+      getComputedStyle(document.getElementById('wrapper')).opacity === '1'
+    );
+  });
+});
+```
 
 ---
 
-## Notes — Already Compliant
+## Architecture
 
-- No `eval()` / inline scripts (CSP-safe)
-- No `tabs` permission (we don't read `tab.url` / `tab.title`)
-- `host_permissions` narrowly scoped to `https://api.flickr.com/`
-- Event listeners registered at top level of service worker
-- All chrome API calls use `async/await`
-- State persisted in `chrome.storage`, not global variables
+```
+visivotab/
+├── manifest.json          # MV3 extension manifest
+├── background.js          # Service worker entry point (imports from src/)
+├── flickrset.js           # New tab page entry point (imports from src/)
+├── flickrset.html         # New tab page HTML
+├── src/
+│   ├── photo-cache.js     # Testable: Flickr API, caching logic
+│   └── newtab.js          # Testable: UI helpers, pure functions
+├── test/
+│   ├── photo-cache.test.js
+│   └── newtab.test.js
+├── package.json
+└── vitest.config.js
+```
+
+**Key design decisions for testability**:
+1. **Pure functions** — No side effects, easy to test with any input
+2. **Dependency injection** — `storage` and `fetch` passed as parameters
+3. **Separation** — Entry points (`background.js`, `flickrset.js`) wire dependencies;
+   logic lives in `src/` modules that don't depend on browser globals

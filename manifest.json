@@ -15,9 +15,4 @@
   ],
   "host_permissions": [
     "https://api.flickr.com/"
-  ],
-  "icons": {
-    "48": "gplustab_48.jpg",
-    "128": "gplustab_128.jpg"
-  }
-}
+  ]}
